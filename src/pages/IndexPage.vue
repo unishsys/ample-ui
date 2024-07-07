@@ -11,10 +11,12 @@
 
         <div v-for="(message, index) in messages" :key="index"
           :class="{ 'user-message': message.isUser, 'bot-message': !message.isUser }">
-          <p>{{ message.text }}</p>
+          <p v-if="message.isUser">{{ message.text }}</p>
+          <p v-else v-html="message.text"></p>
+
         </div>
-        <div v-if="streamText != '__streaming__'" class="bot-message">
-          <p>{{ streamText }}</p>
+        <div v-if="streamText != '__Sorry Something is wrong__'" class="bot-message">
+          <p v-html="streamText"></p>
         </div>
       </q-card-section>
 
@@ -29,11 +31,25 @@
 <script setup>
 import { ref } from 'vue'
 import { Notify } from 'quasar'
+import { marked } from 'marked';
+import hljs from 'highlight.js';
 
-const streamText = ref('__streaming__')
+
+const streamText = ref('__Sorry Something is wrong__')
 const userInput = ref('')
 const messages = ref([])
 
+
+marked.setOptions({
+  highlight: function (code, lang) {
+    if (lang && hljs.getLanguage(lang)) {
+      return hljs.highlight(lang, code).value;
+    }
+    return hljs.highlightAuto(code).value;
+  },
+  breaks: true,
+  gfm: true
+});
 
 async function sendMessage() {
   if (userInput.value.trim() !== '') {
@@ -68,7 +84,6 @@ async function sendMessage() {
           color: "red-6",
           position: "top-right"
         })
-        return
       }
       const reader = response.body.getReader();
       const decoder = new TextDecoder('utf-8');
@@ -84,9 +99,9 @@ async function sendMessage() {
           const json = JSON.parse(chunk);
 
           if (json.response) {
-            streamText.value += json.response;
             try {
 
+              streamText.value += json.response;
               botMessage.value.text += json.response;
             } catch (error) {
               console.log(error)
@@ -104,9 +119,9 @@ async function sendMessage() {
       console.error('Error:', error);
     }
   }
-  messages.value.push({ text: streamText.value, isUser: false })
+  messages.value.push({ text: marked(streamText.value), isUser: false })
   console.log(messages)
-  streamText.value = "__streaming__"
+  streamText.value = "__Sorry Something is wrong__"
 
   messages.value = messages.value.filter(message => message.text !== "");
 
@@ -115,6 +130,8 @@ async function sendMessage() {
 </script>
 
 <style scoped>
+@import 'highlight.js/styles/github-dark.css';
+
 .chat-card {
   width: 100%;
   max-width: 600px;
@@ -153,15 +170,14 @@ async function sendMessage() {
 }
 
 .user-message {
-  background-color: #1e88e5;
+  background-color: #3c3c3c;
   color: #ffffff;
   align-self: flex-end;
   /* Align to the right for user messages */
 }
 
 .bot-message {
-  background-color: #2e7d32;
-  color: #ffffff;
+  background-color: #3c3c50;
   align-self: flex-start;
   /* Align to the left for bot messages */
 }
