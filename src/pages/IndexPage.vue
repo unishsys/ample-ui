@@ -68,6 +68,7 @@ async function sendMessage() {
           color: "red-6",
           position: "top-right"
         })
+        return
       }
       const reader = response.body.getReader();
       const decoder = new TextDecoder('utf-8');
