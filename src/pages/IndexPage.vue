@@ -8,9 +8,13 @@
       </q-card-section>
 
       <q-card-section class="chat-section">
+
         <div v-for="(message, index) in messages" :key="index"
           :class="{ 'user-message': message.isUser, 'bot-message': !message.isUser }">
           <p>{{ message.text }}</p>
+        </div>
+        <div v-if="streamText != '__streaming__'" class="bot-message">
+          <p>{{ streamText }}</p>
         </div>
       </q-card-section>
 
@@ -24,21 +28,89 @@
 
 <script setup>
 import { ref } from 'vue'
+import { Notify } from 'quasar'
 
+const streamText = ref('__streaming__')
 const userInput = ref('')
-const messages = ref([{ text: "foo", isUser: true }, { text: "bar", isUser: false }])
+const messages = ref([])
 
-function sendMessage() {
+
+async function sendMessage() {
   if (userInput.value.trim() !== '') {
     messages.value.push({ text: userInput.value, isUser: true })
+    let userMessage = userInput.value
     userInput.value = ''
 
-    // Simulate a response from the bot
-    setTimeout(() => {
-      messages.value.push({ text: 'This is a simulated response from ChatGPT', isUser: false })
-    }, 1000)
+    const botMessage = { text: '', isUser: false }
+    messages.value.push(botMessage)
+
+    try {
+      const url = 'http://localhost:8080/chat/71187ba6-41c5-4254-b7ca-0947964c7afc';
+      const options = {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          "prompt": userMessage
+        })
+      };
+
+      console.log(options)
+      const response = await fetch(url, options);
+
+      if (!response.body) {
+        throw new Error('ReadableStream not supported by the browser.');
+      }
+      if (response.status != 200) {
+        const data = await response.json();
+
+        Notify.create({
+          message: data.error,
+          color: "red-6",
+          position: "top-right"
+        })
+      }
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder('utf-8');
+      let done = false;
+
+      streamText.value = ""
+      while (!done) {
+        const { value, done: readerDone } = await reader.read();
+        if (readerDone) break;
+
+        const chunk = decoder.decode(value, { stream: true });
+        try {
+          const json = JSON.parse(chunk);
+
+          if (json.response) {
+            streamText.value += json.response;
+            try {
+
+              botMessage.value.text += json.response;
+            } catch (error) {
+              console.log(error)
+            }
+          }
+          done = json.done;
+          if (done) {
+
+          }
+        } catch (error) {
+          console.error('Error parsing JSON chunk:', error);
+        }
+      }
+    } catch (error) {
+      console.error('Error:', error);
+    }
   }
+  messages.value.push({ text: streamText.value, isUser: false })
+  console.log(messages)
+  streamText.value = "__streaming__"
+
+  messages.value = messages.value.filter(message => message.text !== "");
+
 }
+
 </script>
 
 <style scoped>
@@ -52,7 +124,6 @@ function sendMessage() {
 }
 
 .chat-header {
-  text-align: center;
   font-size: 1.2em;
   font-weight: bold;
   color: #bb86fc;
@@ -64,7 +135,6 @@ function sendMessage() {
   flex-direction: column;
   max-height: 400px;
   overflow-y: auto;
-  padding: 10px;
   border-bottom: 2px solid #1f1f1f;
   background-color: #121212;
 }
@@ -74,9 +144,9 @@ function sendMessage() {
   width: fit-content;
   display: block;
   padding: 10px;
+  margin-bottom: 2%;
   border-radius: 10px;
   word-wrap: break-word;
-  text-align: center;
   align-self: flex-start;
   align-content: center;
 }
