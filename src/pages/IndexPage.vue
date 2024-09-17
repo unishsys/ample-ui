@@ -61,7 +61,7 @@ async function sendMessage() {
     messages.value.push(botMessage)
 
     try {
-      const url = 'http://localhost:8080/chat/71187ba6-41c5-4254-b7ca-0947964c7afc';
+      const url = 'https://chatapi.sabbir.dev/chat/77252db7-0e8e-4f41-a9f3-aa42688a6481';
       const options = {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
